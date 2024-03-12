@@ -22,15 +22,15 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 	event AddressChanged(uint256 indexed token, uint256 cty, bytes value);
 	event ContenthashChanged(uint256 indexed token, bytes value);
 
+	// https://adraffy.github.io/keccak.js/test/demo.html#algo=keccak-256&s=universal&escape=1&encoding=utf8
+	uint256 constant EVM_CTY = 0x06e0989d8168c3a954e5b385b12a16a30139850a1596d8de0f6ecfc92bed71a8; // | 0x8000000 = 0
+
 	uint256 public totalSupply;
 	string public baseUri;
 	mapping(bytes32 => mapping(string => string)) _texts;
 	mapping(bytes32 => mapping(uint256 => bytes)) _addrs;
 	mapping(bytes32 => bytes) _hashes;
 	mapping(uint256 => string) _names;
-
-	// https://adraffy.github.io/keccak.js/test/demo.html#algo=keccak-256&s=universal&escape=1&encoding=utf8
-	uint256 constant EVM_CTY = 0x06e0989d8168c3a954e5b385b12a16a30139850a1596d8de0f6ecfc92bed71a8; // | 0x8000000 = 0
 
 	constructor(
 		address _owner,
@@ -48,7 +48,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 		baseUri = _baseUri;
 	}
 
-	// admin setters
+	// ERC721Pausable
 	function pause() public onlyOwner {
 		_pause();
 	}
@@ -56,6 +56,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 		_unpause();
 	}
 
+	// ERC721
 	function _update(address to, uint256 token, address auth) internal override(ERC721, ERC721Pausable) returns (address) {
 		if (_ownerOf(token) != address(0)) {
 			// on trade, auto-enable evm address from owner...
@@ -65,13 +66,6 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 			}
 		}
 		return super._update(to, token, auth);
-	}
-
-	modifier requireOwner(uint256 token) {
-		if (_ownerOf(token) != msg.sender) {
-			revert Unauthorized();
-		}
-		_;
 	}
 
 	// registration
@@ -87,16 +81,11 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 	function _nodeFromParts(address owner, uint256 token) internal pure returns (bytes32) {
 		return keccak256(abi.encodePacked(token, owner));
 	}
-	function register(
-		string calldata label,
-		address owner,
-		address evmAddress,
-		string calldata avatar
-	) external returns (uint256 token) {
+	function register(string calldata label, address owner, address evmAddress, string calldata avatar) external {
 		if (!_isValidLabel(label)) {
 			revert InvalidName();
 		}
-		token = _tokenFromLabel(label);
+		uint256 token = _tokenFromLabel(label);
 		_safeMint(owner, token); // This will fail if the node is already registered
 		_names[token] = label; // reverse name
 		bytes32 node = _nodeFromParts(owner, token);
@@ -115,6 +104,12 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 	}
 
 	// record setters
+	modifier requireOwner(uint256 token) {
+		if (_ownerOf(token) != msg.sender) {
+			revert Unauthorized();
+		}
+		_;
+	}
 	function _unsafeSetAddr(address owner, uint256 token, uint256 cty, bytes memory value) internal {
 		_addrs[_nodeFromParts(owner, token)][cty] = value;
 		emit AddressChanged(token, cty, value);
@@ -144,7 +139,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 	}
 	function text(uint256 token, string calldata key) external view returns (string memory) {
 		return _texts[_nodeFromParts(_ownerOf(token), token)][key];
-	}    
+	}
 	function contenthash(uint256 token) external view returns (bytes memory) {
 		return _hashes[_nodeFromParts(_ownerOf(token), token)];
 	}
