@@ -1,7 +1,7 @@
 {
 	"type": "module",
 	"dependencies": {
-		"@adraffy/blocksmith": "^0.0.6"
+		"@adraffy/blocksmith": "^0.0.7"
 	},
 	"scripts": {
 		"test": "node test/test.js"
