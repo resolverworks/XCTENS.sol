@@ -1,0 +1,6 @@
+create foundry.toml
+forge install openzeppelin/openzeppelin-contracts
+forge install ensdomains/ens-contracts
+
+create package.json
+npm i @adraffy/blocksmith
