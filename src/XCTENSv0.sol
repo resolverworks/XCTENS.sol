@@ -8,15 +8,13 @@ import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ER
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Multicallable} from "@ensdomains/ens-contracts/contracts/resolvers/Multicallable.sol";
 
-// libraries
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
 contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 
 	function supportsInterface(bytes4 x) public view override(ERC721, Multicallable) returns (bool) {
 		return super.supportsInterface(x);
 	}
 
+	error InvalidName();
 	error Unauthorized();
 
 	event Registered(uint256 indexed token, string name);
@@ -29,7 +27,6 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 
 	uint256 public totalSupply;
 	string public baseUri;
-	address signer;
 	mapping(bytes32 => mapping(string => string)) _texts;
 	mapping(bytes32 => mapping(uint256 => bytes)) _addrs;
 	mapping(bytes32 => bytes) _hashes;
@@ -37,23 +34,18 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 
 	constructor(
 		address _owner,
-		address _signer,
 		string memory _name,
 		string memory _symbol,
 		string memory _baseUri
 	) ERC721(_name, _symbol) Ownable(_owner) {
 		baseUri = _baseUri;
-		signer = _signer;
 	}
 	
 	function _baseURI() internal view override returns (string memory) {
 		return baseUri;
 	}
-	function setBaseURI(string memory _baseUri) external onlyOwner {
+	function setBaseURI(string memory _baseUri) public onlyOwner {
 		baseUri = _baseUri;
-	}
-	function setSigner(address _signer) external onlyOwner {
-		signer = _signer;
 	}
 
 	// ERC721Pausable
@@ -80,19 +72,19 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 	function _tokenFromLabel(string memory label) internal pure returns (uint256) {
 		return uint256(keccak256(abi.encodePacked(label)));
 	}
-	function tokenFor(string calldata label) external pure returns (uint256) {
-		return _tokenFromLabel(label);
-	}
-
 	function _isEVM(uint256 cty) internal pure returns (bool) {
 		return cty == 60 || (cty & 0x80000000) != 0;
+	}
+	function _isValidLabel(string calldata label) internal pure returns (bool) {
+		return bytes(label).length >= 4;
 	}
 	function _nodeFromParts(address owner, uint256 token) internal pure returns (bytes32) {
 		return keccak256(abi.encodePacked(token, owner));
 	}
-	function register(bytes calldata proof, string calldata label, address owner, address evmAddress, string calldata avatar) external {		
-		address signed = ECDSA.recover(keccak256(abi.encodePacked(signer, label)), proof);
-		if (signed != signer) revert Unauthorized();
+	function register(string calldata label, address owner, address evmAddress, string calldata avatar) external {
+		if (!_isValidLabel(label)) {
+			revert InvalidName();
+		}
 		uint256 token = _tokenFromLabel(label);
 		_safeMint(owner, token); // This will fail if the node is already registered
 		_names[token] = label; // reverse name
@@ -101,6 +93,14 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 		_texts[node]["avatar"] = avatar;
 		totalSupply++;
 		emit Registered(token, label);
+	}
+	
+	// registration getters
+	function tokenFor(string calldata label) external pure returns (uint256) {
+		return _tokenFromLabel(label);
+	}
+	function available(string calldata label) external view returns (bool) {
+		return _ownerOf(_tokenFromLabel(label)) == address(0) && _isValidLabel(label);
 	}
 
 	// record setters
