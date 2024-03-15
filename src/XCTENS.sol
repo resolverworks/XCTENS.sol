@@ -6,14 +6,13 @@ pragma solidity ^0.8.23;
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Multicallable} from "@ensdomains/ens-contracts/contracts/resolvers/Multicallable.sol";
 
 // libraries
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
+contract XCTENS is ERC721, ERC721Pausable, Ownable {
 
-	function supportsInterface(bytes4 x) public view override(ERC721, Multicallable) returns (bool) {
+	function supportsInterface(bytes4 x) public view override(ERC721) returns (bool) {
 		return super.supportsInterface(x);
 	}
 
@@ -145,6 +144,17 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable, Multicallable {
 	}
 	function name(uint256 token) external view returns (string memory) {
 		return _names[token];
+	}
+
+	// multicall
+	function multicall(bytes[] calldata calls) external returns (bytes[] memory answers) {
+		unchecked {
+			uint256 n = calls.length;
+			answers = new bytes[](n);
+			for (uint256 i; i < n; i += 1) {
+				(, answers[i]) = address(this).delegatecall(calls[i]);
+			}
+		}
 	}
 
 }
