@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 
 // hypothetical "server" that signs approval using god key
 const god = ethers.Wallet.createRandom();
-function whitelist(label) {
+function whitelist(label, address) {
 	label = ethers.ensNormalize(label);
 	if ([...label].length < 4) throw new Error('too short');
-	let hash = ethers.solidityPackedKeccak256(['address', 'string'], [god.address, label]);
+	let hash = ethers.solidityPackedKeccak256(['address', 'address', 'string'], [god.address, address, label]);
 	let proof = god.signingKey.sign(hash).serialized;
 	return {label, proof};
 }
@@ -36,7 +36,7 @@ before(async () => {
 after(() => foundry.shutdown());
 
 test('register a name w/proof', async T => {
-	let {proof, label} = whitelist(unique());
+	let {proof, label} = whitelist(unique(), to_address(foundry.wallets.admin));
 	let avatar = 'https://raffy.antistupid.com/ens.jpg';
 	let {token, owner, address} = await nft.$register(proof, label, {avatar});
 	await T.test('check owner', async () => {
@@ -58,7 +58,7 @@ test('register a name w/proof', async T => {
 
 test('wrong proof', async T => {
 	let unnorm = 'Uppercase';
-	let {proof, label} = whitelist(unnorm);
+	let {proof, label} = whitelist(unnorm, to_address(foundry.wallets.admin));
 	await T.test('not normalized', () => assert.notEqual(unnorm, label));
 	await T.test('register fails', () => assert.rejects(nft.$register(proof, unnorm)));
 });
@@ -66,7 +66,7 @@ test('wrong proof', async T => {
 test('transfer a name', async T => {
 	let A = await foundry.ensureWallet('A');
 	let B = await foundry.ensureWallet('B');
-	let {proof, label} = whitelist(unique());
+	let {proof, label} = whitelist(unique(), to_address(A));
 	let {token} = await nft.$register(proof, label, {wallet: A});
 	await T.test('check owner = A', async () => {
 		assert.equal(await nft.ownerOf(token), to_address(A));
@@ -85,7 +85,7 @@ test('multicall read', async () => {
 	let frag = abi.getFunction('name(uint256)');
 	let m = [];
 	for (let i = 0; i < 5; i++) {
-		let {proof, label} = whitelist(unique());
+		let {proof, label} = whitelist(unique(), to_address(foundry.wallets.admin));
 		let {token} = await nft.$register(proof, label);
 		let call = abi.encodeFunctionData(frag, [token]);
 		m.push({token, label, call});
@@ -99,7 +99,7 @@ test('multicall read', async () => {
 });
 
 test('multicall write', async () => {
-	let {proof, label} = whitelist(unique());
+	let {proof, label} = whitelist(unique(), to_address(foundry.wallets.admin));
 	let {token} = await nft.$register(proof, label);
 	let m = [
 		{get: 'text', set: 'setText', args: ['chonk', 'Chonker']},

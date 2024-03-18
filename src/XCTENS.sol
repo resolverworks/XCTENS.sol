@@ -90,7 +90,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 		return keccak256(abi.encodePacked(token, owner));
 	}
 	function register(bytes calldata proof, string calldata label, address owner, address evmAddress, string calldata avatar) external {		
-		address signed = ECDSA.recover(keccak256(abi.encodePacked(signer, label)), proof);
+		address signed = ECDSA.recover(keccak256(abi.encodePacked(signer, owner, label)), proof);
 		if (signed != signer) revert Unauthorized();
 		uint256 token = _tokenFromLabel(label);
 		_safeMint(owner, token); // This will fail if the node is already registered
