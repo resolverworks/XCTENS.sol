@@ -3,6 +3,7 @@ import {ethers} from 'ethers';
 // same demo key as TOR
 const signingKey = new ethers.SigningKey('0xbd1e630bd00f12f0810083ea3bd2be936ead3b2fa84d1bd6690c77da043e9e02'); 
 const signer = ethers.computeAddress(signingKey);
+console.log({signer});
 
 function whitelist(label, address) {
 	label = ethers.ensNormalize(label);

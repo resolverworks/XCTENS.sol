@@ -38,7 +38,13 @@ after(() => foundry.shutdown());
 test('register a name w/proof', async T => {
 	let {proof, label} = whitelist(unique(), to_address(foundry.wallets.admin));
 	let avatar = 'https://raffy.antistupid.com/ens.jpg';
-	let {token, owner, address} = await nft.$register(proof, label, {avatar});
+	await T.test('check available = true', async () => {
+		assert.equal(await nft.available(label), true);
+	});
+	let {token, owner, address} = await nft.$register(proof, label, {avatar});	
+	await T.test('check available = false', async () => {
+		assert.equal(await nft.available(label), false);
+	});
 	await T.test('check owner', async () => {
 		assert.equal(await nft.ownerOf(token), owner);
 	});

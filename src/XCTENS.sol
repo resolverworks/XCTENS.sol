@@ -82,6 +82,9 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	function tokenFor(string calldata label) external pure returns (uint256) {
 		return _tokenFromLabel(label);
 	}
+	function available(string calldata label) external view returns (bool) {
+		return _ownerOf(_tokenFromLabel(label)) == address(0);
+	}
 
 	function _isEVM(uint256 cty) internal pure returns (bool) {
 		return cty == 60 || (cty & 0x80000000) != 0;
