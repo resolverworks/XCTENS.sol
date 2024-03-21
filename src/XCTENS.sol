@@ -28,7 +28,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 
 	uint256 public totalSupply;
 	string public baseUri;
-	address signer;
+	address public signer;
 	mapping(bytes32 => mapping(string => string)) _texts;
 	mapping(bytes32 => mapping(uint256 => bytes)) _addrs;
 	mapping(bytes32 => bytes) _hashes;
@@ -56,10 +56,10 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	}
 
 	// ERC721Pausable
-	function pause() public onlyOwner {
+	function pause() external onlyOwner {
 		_pause();
 	}
-	function unpause() public onlyOwner {
+	function unpause() external onlyOwner {
 		_unpause();
 	}
 
