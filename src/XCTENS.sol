@@ -64,9 +64,6 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	}
 	
 	// utils
-	function _isEVM(uint256 cty) internal pure returns (bool) {
-		return cty == 60 || (cty & 0x80000000) != 0;
-	}
 	function _nodeFromParts(address owner, uint256 token) internal pure returns (bytes32) {
 		return keccak256(abi.encodePacked(token, owner));
 	}
@@ -127,12 +124,8 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	}
 
 	// record getters
-	function addr(uint256 token, uint256 cty) external view returns (bytes memory v) {
-		bytes32 node = _node(token);
-		v = _addrs[node][cty];
-		if (v.length == 0 && _isEVM(cty)) {
-			v = _addrs[node][EVM_CTY];
-		}
+	function addr(uint256 token, uint256 cty) external view returns (bytes memory) {
+		return _addrs[_node(token)][cty];
 	}
 	function text(uint256 token, string calldata key) external view returns (string memory) {
 		return _texts[_node(token)][key];

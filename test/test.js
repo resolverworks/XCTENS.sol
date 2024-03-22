@@ -74,31 +74,11 @@ test('register a name w/proof', async T => {
 	await T.test('check evm', async () => {
 		assert.equal(await nft.addr(token, EVM_CTY), address.toLowerCase());
 	});
-	await T.test('check evm: addr(60)', async () => {
-		assert.equal(await nft.addr(token, 60), address.toLowerCase());
-	});
-	await T.test('check evm: addr(poly)', async () => {
-		assert.equal(await nft.addr(token, 0x80000000 + 139), address.toLowerCase());
-	});
 });
 
 test('register to 0x0', async T => {
 	let {proof, label} = whitelist(unique(), to_address(foundry.wallets.admin));
 	await assert.rejects(() => nft.$register(proof, label, {owner: ethers.ZeroAddress}));
-});
-
-test('evm address', async T => {
-	let {proof, label} = whitelist(unique(), to_address(foundry.wallets.admin));
-	let {token, address} = await nft.$register(proof, label);
-	await T.test('addr(60) != 0', async () => {
-		assert.equal(await nft.addr(token, 60), address.toLowerCase());
-	});
-	await T.test('clear evm', async () => {
-		await foundry.confirm(nft.setAddr(token, EVM_CTY, '0x'));
-	});
-	await T.test('addr(60) == 0', async () => {
-		assert.equal(await nft.addr(token, 60), '0x');
-	});
 });
 
 test('wrong proof', async T => {
@@ -126,8 +106,8 @@ test('transfer a name', async T => {
 	await T.test('check avatar is unset', async () => {
 		assert.equal(await nft.text(token, 'avatar'), '');
 	});
-	await T.test('check address set automatically', async () => {
-		assert.equal(ethers.getAddress(await nft.addr(token, 60)), to_address(B));
+	await T.test('check evm set automatically', async () => {
+		assert.equal(ethers.getAddress(await nft.addr(token, EVM_CTY)), to_address(B));
 	});
 	await foundry.confirm(nft.connect(B).safeTransferFrom(to_address(B), to_address(A), token));
 	await T.test('check avatar is restored', async () => {
