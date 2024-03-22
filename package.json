@@ -1,9 +1,13 @@
 {
 	"type": "module",
-	"dependencies": {
-		"@adraffy/blocksmith": "^0.0.10"
-	},
 	"scripts": {
-		"test": "node test/test.js"
+		"test": "node test/test.js",
+		"test-proof": "node --env-file=.env test/proof.js",
+		"test-register": "node --env-file=.env test/register.js",
+		"test-multicall": "node --env-file=.env test/multicall.js"
+	},
+	"devDependencies": {
+		"@adraffy/blocksmith": "^0.0.10",
+		"ethers": "^6.11.1"
 	}
 }

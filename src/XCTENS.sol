@@ -18,9 +18,9 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 
 	error Unauthorized();
 
-	event Registered(uint256 indexed token, string name);
-	event TextChanged(uint256 indexed token, string indexed key, string value);
-	event AddressChanged(uint256 indexed token, uint256 cty, bytes value);
+	event Registered(uint256 indexed token, string name, address owner);
+	event TextChanged(uint256 indexed token, string key, string value);
+	event AddrChanged(uint256 indexed token, uint256 cty, bytes value);
 	event ContenthashChanged(uint256 indexed token, bytes value);
 
 	// https://adraffy.github.io/keccak.js/test/demo.html#algo=keccak-256&s=universal&escape=1&encoding=utf8
@@ -31,7 +31,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	address public signer;
 	mapping(bytes32 => mapping(string => string)) _texts;
 	mapping(bytes32 => mapping(uint256 => bytes)) _addrs;
-	mapping(bytes32 => bytes) _hashes;
+	mapping(bytes32 => bytes) _chashes;
 	mapping(uint256 => string) _names;
 
 	constructor(
@@ -62,17 +62,27 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	function unpause() external onlyOwner {
 		_unpause();
 	}
+	
+	// utils
+	function _isEVM(uint256 cty) internal pure returns (bool) {
+		return cty == 60 || (cty & 0x80000000) != 0;
+	}
+	function _nodeFromParts(address owner, uint256 token) internal pure returns (bytes32) {
+		return keccak256(abi.encodePacked(token, owner));
+	}
+	function _node(uint256 token) internal view returns (bytes32) {
+		return _nodeFromParts(_ownerOf(token), token);
+	}
 
 	// ERC721
-	function _update(address to, uint256 token, address auth) internal override(ERC721, ERC721Pausable) returns (address) {
-		if (_ownerOf(token) != address(0)) {
-			// on trade, auto-enable evm address from owner...
-			bytes32 node = _nodeFromParts(to, token);
-			if (_addrs[node][EVM_CTY].length == 0) { // ...only if unset
-				_addrs[node][EVM_CTY] = abi.encodePacked(to);
+	function _update(address to, uint256 token, address auth) internal override(ERC721, ERC721Pausable) returns (address ret) {
+		address prior = _ownerOf(token);
+		ret = super._update(to, token, auth); // execute the trade
+		if (prior != address(0)) { // on trade, auto-enable evm address from owner...
+			if (_addrs[_node(token)][EVM_CTY].length == 0) { // ...if unset
+				_setAddr(token, EVM_CTY, abi.encodePacked(to));
 			}
 		}
-		return super._update(to, token, auth);
 	}
 
 	// registration
@@ -86,77 +96,94 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 		return _ownerOf(_tokenFromLabel(label)) == address(0);
 	}
 
-	function _isEVM(uint256 cty) internal pure returns (bool) {
-		return cty == 60 || (cty & 0x80000000) != 0;
-	}
-	function _nodeFromParts(address owner, uint256 token) internal pure returns (bytes32) {
-		return keccak256(abi.encodePacked(token, owner));
-	}
 	function register(bytes calldata proof, string calldata label, address owner, address evmAddress, string calldata avatar) external {		
 		address signed = ECDSA.recover(keccak256(abi.encodePacked(signer, owner, label)), proof);
 		if (signed != signer) revert Unauthorized();
 		uint256 token = _tokenFromLabel(label);
 		_safeMint(owner, token); // This will fail if the node is already registered
 		_names[token] = label; // reverse name
-		bytes32 node = _nodeFromParts(owner, token);
-		_addrs[node][EVM_CTY] = abi.encodePacked(evmAddress);
-		_texts[node]["avatar"] = avatar;
 		totalSupply++;
-		emit Registered(token, label);
+		emit Registered(token, label, owner);
+		if (evmAddress != address(0)) {
+			_setAddr(token, EVM_CTY, abi.encodePacked(evmAddress));
+		}
+		if (bytes(avatar).length > 0) {
+			_setText(token, "avatar", avatar);
+		}
 	}
 
-	// record setters
-	modifier requireOwner(uint256 token) {
-		if (_ownerOf(token) != msg.sender) {
-			revert Unauthorized();
-		}
-		_;
+	// unsafe setters
+	function _setAddr(uint256 token, uint256 cty, bytes memory value) internal {
+		_addrs[_node(token)][cty] = value;
+		emit AddrChanged(token, cty, value);
 	}
-	function _unsafeSetAddr(address owner, uint256 token, uint256 cty, bytes memory value) internal {
-		_addrs[_nodeFromParts(owner, token)][cty] = value;
-		emit AddressChanged(token, cty, value);
-	}
-	function setEVMAddress(uint256 token, address a) external requireOwner(token)  {
-		_unsafeSetAddr(msg.sender, token, EVM_CTY, abi.encodePacked(a));
-	}
-	function setAddr(uint256 token, uint256 cty, bytes calldata value) external requireOwner(token) {
-		_unsafeSetAddr(msg.sender, token, cty, value);
-	}
-	function setText(uint256 token, string calldata key, string calldata value) external requireOwner(token) {
-		_texts[_nodeFromParts(msg.sender, token)][key] = value;
+	function _setText(uint256 token, string memory key, string memory value) internal {
+		_texts[_node(token)][key] = value;
 		emit TextChanged(token, key, value);
 	}
-	function setContenthash(uint256 token, bytes calldata value) external requireOwner(token) {
-		_hashes[_nodeFromParts(msg.sender, token)] = value;
+	function _setContenthash(uint256 token, bytes memory value) internal {
+		_chashes[_node(token)] = value;
 		emit ContenthashChanged(token, value);
 	}
 
 	// record getters
 	function addr(uint256 token, uint256 cty) external view returns (bytes memory v) {
-		bytes32 node = _nodeFromParts(_ownerOf(token), token);
+		bytes32 node = _node(token);
 		v = _addrs[node][cty];
 		if (v.length == 0 && _isEVM(cty)) {
 			v = _addrs[node][EVM_CTY];
 		}
 	}
 	function text(uint256 token, string calldata key) external view returns (string memory) {
-		return _texts[_nodeFromParts(_ownerOf(token), token)][key];
+		return _texts[_node(token)][key];
 	}
 	function contenthash(uint256 token) external view returns (bytes memory) {
-		return _hashes[_nodeFromParts(_ownerOf(token), token)];
+		return _chashes[_node(token)];
 	}
 	function name(uint256 token) external view returns (string memory) {
 		return _names[token];
 	}
 
-	// multicall
+	// record setters
+	modifier requireOwner(uint256 token) {
+		if (_ownerOf(token) != msg.sender) revert Unauthorized();
+		_;
+	}
+	function setAddr(uint256 token, uint256 cty, bytes calldata value) external requireOwner(token) {
+		_setAddr(token, cty, value);
+	}
+	function setText(uint256 token, string calldata key, string calldata value) external requireOwner(token) {
+		_setText(token, key, value);
+	}
+	function setContenthash(uint256 token, bytes calldata value) external requireOwner(token) {
+		_setContenthash(token, value);
+	}
+
+	// traditional multicall
 	function multicall(bytes[] calldata calls) external returns (bytes[] memory answers) {
 		unchecked {
 			uint256 n = calls.length;
 			answers = new bytes[](n);
 			for (uint256 i; i < n; i += 1) {
-				(, answers[i]) = address(this).delegatecall(calls[i]);
+				(bool ok, bytes memory v) = address(this).delegatecall(calls[i]);
+				if (!ok) assembly { revert(add(v, 32), mload(v)) } // throw first error
+				answers[i] = v;
 			}
+		}
+	}
+
+	// convenient multicall
+	struct Text { string key; string value; }
+	struct Addr { uint256 cty; bytes value; }
+	function setRecords(uint256 token, Text[] calldata texts, Addr[] calldata addrs, bytes[] calldata chash) requireOwner(token) external {
+		for (uint256 i; i < texts.length; i += 1) {
+			_setText(token, texts[i].key, texts[i].value);
+		}
+		for (uint256 i; i < addrs.length; i += 1) {
+			_setAddr(token, addrs[i].cty, addrs[i].value);
+		}
+		if (chash.length == 1) {
+			_setContenthash(token, chash[0]);
 		}
 	}
 

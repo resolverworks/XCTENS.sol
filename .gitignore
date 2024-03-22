@@ -5,3 +5,6 @@ node_modules/
 # foundry
 cache/
 out/
+
+# stuff
+.env
