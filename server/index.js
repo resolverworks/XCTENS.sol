@@ -142,7 +142,7 @@ function create_image(token, record) {
 	ctx.textBaseline = 'bottom';
 	
 	let name_info = compute_font_size(ctx, 256, record.name(), SS);
-	let base_info = compute_font_size(ctx, 64, NFT.basename, S);
+	let base_info = compute_font_size(ctx, 64, BASENAME, S);
 
 	ctx.fillStyle = '#fff';
 	draw_text(ctx, name_info, inset, S - 2*inset - base_info.actualBoundingBoxAscent);
