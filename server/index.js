@@ -1,6 +1,7 @@
 
 import {createServer} from 'node:http';
 import {EZCCIP, error_with} from '@resolverworks/ezccip';
+import {Record} from '@resolverworks/enson';
 import {createCanvas, GlobalFonts} from '@napi-rs/canvas';
 import {ethers} from 'ethers';
 import {NFT} from './nft.js';
@@ -10,13 +11,26 @@ GlobalFonts.registerFromPath(new URL('./fonts/NotoColorEmoji-Regular.ttf', impor
 const FONT = 'Text, Emoji';
 
 const PORT = 8017;
+const BASENAME = 'xctens-eg.eth';
 const PUBLIC_URL = 'https://home.antistupid.com/xctens-eg';
 const CCIP_ENDPOINT = '/ccip';
 
 const signingKey = new ethers.SigningKey('0xbd1e630bd00f12f0810083ea3bd2be936ead3b2fa84d1bd6690c77da043e9e02'); // d00d
 
 const ezccip = new EZCCIP();
-ezccip.enableENSIP10(NFT.resolve.bind(NFT));
+ezccip.enableENSIP10(name => {
+	if (name === BASENAME) { // record for basename
+		return Record.from({
+			name: BASENAME,
+			url: 'Mint your own at https://chonk.com',
+			$op: NFT.contract.target, // this should be whatever chain the contract is deployed on
+		});
+	}
+	if (!name.endsWith(BASENAME)) return;
+	let label = name.slice(0, -(1 + BASENAME.length)); 
+	if (label.includes('.')) return;
+	return NFT.resolve(label);
+});
 
 const http = createServer(async (req, reply) => {
 	try {
@@ -70,7 +84,7 @@ http.listen(PORT).once('listening', () => {
 	console.log(`Listening on ${http.address().port}`);
 	console.log(`Signer: ${ethers.computeAddress(signingKey)}`);
 	console.log(`Endpoint: ${PUBLIC_URL}${CCIP_ENDPOINT}`);
-	console.log(`Basename: ${NFT.basename}`);
+	console.log(`Basename: ${BASENAME}`);
 });
 
 function determine_tor(hint) {
@@ -102,7 +116,7 @@ function create_metadata(token, record) {
 	if (evmAddress) attributes.push({trait_type: 'EVM Address', value: evmAddress.value});
 	return {
 		id: token.toString(),
-		name: `${record.name()}.${NFT.basename}`,
+		name: `${record.name()}.${BASENAME}`,
 		image: `${PUBLIC_URL}/image/${token}`,
 		attributes,
 	};

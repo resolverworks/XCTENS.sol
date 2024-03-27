@@ -45,11 +45,10 @@ class XCTENSRecord extends Record {
 }
 
 export class XCTENS {
-	constructor({provider, contract, basename, fields = [], ...a}) {
+	constructor({provider, contract, fields = []}) {
 		this.contract =  new ethers.Contract(contract, [
 			'function multicall(bytes[]) view returns (bytes[])'
 		], provider);
-		this.basename = basename;
 		this.cache = new Map();
 		this.fields = [
 			{func: 'ownerOf', setter: (r, x) => r.owner = x},
@@ -59,17 +58,11 @@ export class XCTENS {
 			...fields,
 			{func: 'addr', arg: EVM_CTY},
 		];
-		Object.assign(this, a);
 	}
 	tokenFor(name) {
 		return BigInt(ethers.id(name));
 	}
-	async resolve(name) {
-		let {basename} = this;
-		if (name === basename) return this.baseRecord?.();
-		if (!name.endsWith(basename)) return;
-		let label = name.slice(0, -(1 + basename.length)); 
-		if (label.includes('.')) return;
+	async resolve(label) {
 		return this.cached(this.tokenFor(label));
 	}
 	async cached(token) {
