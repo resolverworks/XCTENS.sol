@@ -17,7 +17,7 @@ const contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, [
 	'function register(bytes proof, string label, address owner, address address0, string avatar0)',
 ], signer);
 
-let {label, proof} = whitelist('chonk', signer.address);
+let {label, proof} = whitelist('💩️🚀️abc', signer.address);
 console.log({label, proof});
 
 let tx = await contract.register(proof, label, signer.address, signer.address, '');

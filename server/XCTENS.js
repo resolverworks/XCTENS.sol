@@ -1,4 +1,5 @@
-import {Record, Address, Coin} from '@resolverworks/enson';
+import {Record, Address, Coin, error_with} from '@resolverworks/enson';
+import {SmartCache} from './SmartCache.js';
 import {ethers} from 'ethers';
 
 const NFT_ABI = new ethers.Interface([
@@ -47,9 +48,9 @@ class XCTENSRecord extends Record {
 export class XCTENS {
 	constructor({provider, contract, fields = []}) {
 		this.contract =  new ethers.Contract(contract, [
-			'function multicall(bytes[]) view returns (bytes[])'
+			'function multicall(bytes[]) view returns (bytes[])',
+			'error ERC721NonexistentToken(uint256 token)',
 		], provider);
-		this.cache = new Map();
 		this.fields = [
 			{func: 'ownerOf', setter: (r, x) => r.owner = x},
 			{func: 'name', setter: (r, x) => r.setName(x) },
@@ -58,38 +59,33 @@ export class XCTENS {
 			...fields,
 			{func: 'addr', arg: EVM_CTY},
 		];
+		this.cache = new SmartCache({
+			ms: 15000, 
+			max_pending: 32, 
+			max_cached: 1000
+		});
 	}
 	tokenFor(name) {
 		return BigInt(ethers.id(name));
 	}
-	async resolve(label) {
-		return this.cached(this.tokenFor(label));
-	}
 	async cached(token) {
-		let {cache} = this;
-		let p = cache.get(token);
-		if (Array.isArray(p)) {
-			let [t, res] = p;
-			if (Date.now() - t < 60000) return res;
-			p = null;
-		}
-		if (!p) {
-			p = this.fetch(token).catch(() => {}).then(res => {
-				cache.set(token, [Date.now(), res]);
-				return res;
-			});
-			cache.set(token, p);
-		}
-		return p;
+		return this.cache.get(token, t => this.fetch(t));
 	}
 	async fetch(token) {
+		console.log('fetch', token);
 		let {fields, contract} = this;
 		let calls = fields.map(({func, arg}) => {
 			let args = [token];
 			if (arg !== undefined) args.push(arg);
 			return NFT_ABI.encodeFunctionData(func, args);
 		});
-		let answers = await contract.multicall(calls);
+		let answers;
+		try {
+			answers = await contract.multicall(calls);			
+		} catch (err) {
+			if (err.revert) throw error_with(err.revert.name, {status: 404});
+			throw err;
+		}
 		let record = new XCTENSRecord();
 		fields.forEach(({func, arg, setter}, i) => {
 			try {

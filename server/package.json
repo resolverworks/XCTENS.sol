@@ -1,6 +1,7 @@
 {
 	"type": "module",
 	"dependencies": {
+		"@adraffy/ens-normalize": "^1.10.1",
 		"@napi-rs/canvas": "^0.1.51",
 		"@resolverworks/enson": "^0.0.8",
 		"@resolverworks/ezccip": "^0.0.8",

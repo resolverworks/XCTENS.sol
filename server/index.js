@@ -1,7 +1,8 @@
 
 import {createServer} from 'node:http';
-import {EZCCIP, error_with} from '@resolverworks/ezccip';
+import {EZCCIP, asciiize, error_with} from '@resolverworks/ezccip';
 import {Record} from '@resolverworks/enson';
+import {ens_beautify, ens_split, ens_tokenize} from '@adraffy/ens-normalize';
 import {createCanvas, GlobalFonts} from '@napi-rs/canvas';
 import {ethers} from 'ethers';
 import {NFT} from './nft.js';
@@ -17,6 +18,10 @@ const BASENAME = 'xctens-eg.eth';
 const PUBLIC_URL = 'https://home.antistupid.com/xctens-eg';
 const CCIP_ENDPOINT = '/ccip';
 
+function log(...a) {
+	console.log(new Date(), ...a);
+}
+
 const ezccip = new EZCCIP();
 ezccip.enableENSIP10(name => {
 	if (name === BASENAME) { // record for basename
@@ -29,7 +34,7 @@ ezccip.enableENSIP10(name => {
 	if (!name.endsWith(BASENAME)) return;
 	let label = name.slice(0, -(1 + BASENAME.length)); 
 	if (label.includes('.')) return;
-	return NFT.resolve(label);
+	return NFT.cached(NFT.tokenFor(label));
 });
 
 const http = createServer(async (req, reply) => {
@@ -45,6 +50,7 @@ const http = createServer(async (req, reply) => {
 					let token = BigInt(match[2]);
 					let record = await NFT.cached(token);
 					if (record) {
+						log(action, asciiize(record.name()), token);
 						if (action === 'metadata') {
 							return write_json(reply, create_metadata(token, record));
 						} else {
@@ -62,7 +68,7 @@ const http = createServer(async (req, reply) => {
 				if (url.pathname === CCIP_ENDPOINT) {
 					let {sender, data: calldata} = JSON.parse(await read_body(req));
 					let {data, history} = await ezccip.handleRead(sender, calldata, {signingKey, resolver: determine_tor(url.search.slice(1))});
-					console.log(history.toString());
+					log(history.toString());
 					return write_json(reply, {data});
 				}
 				throw error_with('unknown request', {status: 400});
@@ -71,20 +77,22 @@ const http = createServer(async (req, reply) => {
 		}
 	} catch (err) {
 		let {message, status} = err;
-		if (!status) {
+		if (status) {
+			log(req.method, req.url, status, message);
+		} else {
+			log(req.method, req.url, err);
 			status = 500;
 			message = 'unknown error';
-			console.log(err);
 		}
 		write_json(reply, {message});
 	}
 });
 
 http.listen(PORT).once('listening', () => {
-	console.log(`Listening on ${http.address().port}`);
 	console.log(`Signer: ${ethers.computeAddress(signingKey)}`);
 	console.log(`Endpoint: ${PUBLIC_URL}${CCIP_ENDPOINT}`);
 	console.log(`Basename: ${BASENAME}`);
+	log(`Listening on ${http.address().port}`);
 });
 
 function determine_tor(hint) {
@@ -110,20 +118,25 @@ async function read_body(req) {
 function create_metadata(token, record) {
 	let attributes = [];
 	attributes.push({trait_type: 'Owner', value: record.owner});
+	let name = record.name();
+	let [split] = ens_split(name);
+	attributes.push({trait_type: 'Length', value: split.input.length});
+	attributes.push({trait_type: 'Emoji', value: split.tokens.reduce((a, x) => x.is_emoji?a+1:a, 0)});
+	attributes.push({trait_type: 'Script', value: split.type});
 	let avatar = record.text('avatar');
 	if (avatar) attributes.push({trait_type: 'Avatar', value: avatar});
 	let {evmAddress} = record;
 	if (evmAddress) attributes.push({trait_type: 'EVM Address', value: evmAddress.value});
 	return {
 		id: token.toString(),
-		name: `${record.name()}.${BASENAME}`,
+		name: ens_beautify(`${record.name()}.${BASENAME}`),
 		image: `${PUBLIC_URL}/image/${token}`,
 		attributes,
 	};
 }
 
 function create_image(token, record) {
-	const S = 1000;
+	const S = 1024;
 	const inset = Math.round(S * 0.05);
 	const SS = S - inset*2;
 
