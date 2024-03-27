@@ -10,12 +10,12 @@ GlobalFonts.registerFromPath(new URL('./fonts/ShareTechMono-Regular.ttf', import
 GlobalFonts.registerFromPath(new URL('./fonts/NotoColorEmoji-Regular.ttf', import.meta.url).pathname, 'Emoji');
 const FONT = 'Text, Emoji';
 
-const PORT = 8017;
+const signingKey = new ethers.SigningKey(process.env.PRIVATE_KEY);
+const PORT = parseInt(process.env.HTTP_PORT);
+
 const BASENAME = 'xctens-eg.eth';
 const PUBLIC_URL = 'https://home.antistupid.com/xctens-eg';
 const CCIP_ENDPOINT = '/ccip';
-
-const signingKey = new ethers.SigningKey('0xbd1e630bd00f12f0810083ea3bd2be936ead3b2fa84d1bd6690c77da043e9e02'); // d00d
 
 const ezccip = new EZCCIP();
 ezccip.enableENSIP10(name => {
