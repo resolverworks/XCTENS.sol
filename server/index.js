@@ -84,6 +84,7 @@ const http = createServer(async (req, reply) => {
 			status = 500;
 			message = 'unknown error';
 		}
+		reply.statusCode = status;
 		write_json(reply, {message});
 	}
 });

@@ -81,7 +81,7 @@ export class XCTENS {
 		});
 		let answers;
 		try {
-			answers = await contract.multicall(calls);			
+			answers = await contract.multicall(calls);
 		} catch (err) {
 			if (err.revert) throw error_with(err.revert.name, {status: 404});
 			throw err;
