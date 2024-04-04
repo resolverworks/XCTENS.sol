@@ -14,13 +14,13 @@ function whitelist(label, address) {
 const provider = new ethers.JsonRpcProvider(process.env.PROVIDER_URL);
 const signer = new ethers.Wallet(process.env.CLIENT_PRIVATE_KEY, provider);
 const contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, [
-	'function register(bytes proof, string label, address owner, address address0, string avatar0)',
+	'function register(bytes proof, string label, address owner, tuple(string, string) texts, tuple(uint256, bytes) addrs, bytes chash)',
 ], signer);
 
 let {label, proof} = whitelist('💩️🚀️abc', signer.address);
 console.log({label, proof});
 
-let tx = await contract.register(proof, label, signer.address, signer.address, '');
+let tx = await contract.register(proof, label, signer.address, [], [], '0x');
 
 console.log(tx.hash);
 console.log(await tx.wait());

@@ -23,6 +23,9 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	event AddrChanged(uint256 indexed token, uint256 cty, bytes value);
 	event ContenthashChanged(uint256 indexed token, bytes value);
 
+	struct Text { string key; string value; }
+	struct Addr { uint256 cty; bytes value; }
+
 	// https://adraffy.github.io/keccak.js/test/demo.html#algo=keccak-256&s=universal&escape=1&encoding=utf8
 	uint256 constant EVM_CTY = 0x06e0989d8168c3a954e5b385b12a16a30139850a1596d8de0f6ecfc92bed71a8; // | 0x8000000 = 0
 
@@ -93,7 +96,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 		return _ownerOf(_tokenFromLabel(label)) == address(0);
 	}
 
-	function register(bytes calldata proof, string calldata label, address owner, address evmAddress, string calldata avatar) external {		
+	function register(bytes calldata proof, string calldata label, address owner, Text[] calldata texts, Addr[] calldata addrs, bytes calldata chash) external {
 		address signed = ECDSA.recover(keccak256(abi.encodePacked(signer, owner, label)), proof);
 		if (signed != signer) revert Unauthorized();
 		uint256 token = _tokenFromLabel(label);
@@ -101,11 +104,15 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 		_names[token] = label; // reverse name
 		totalSupply++;
 		emit Registered(token, label, owner);
-		if (evmAddress != address(0)) {
-			_setAddr(token, EVM_CTY, abi.encodePacked(evmAddress));
+		_setAddr(token, EVM_CTY, abi.encodePacked(owner));
+		for (uint256 i; i < texts.length; i += 1) {
+			_setText(token, texts[i].key, texts[i].value);
 		}
-		if (bytes(avatar).length > 0) {
-			_setText(token, "avatar", avatar);
+		for (uint256 i; i < addrs.length; i += 1) {
+			_setAddr(token, addrs[i].cty, addrs[i].value);
+		}
+		if (chash.length != 0) {
+			_setContenthash(token, chash);
 		}
 	}
 
@@ -166,8 +173,6 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	}
 
 	// convenient multicall
-	struct Text { string key; string value; }
-	struct Addr { uint256 cty; bytes value; }
 	function setRecords(uint256 token, Text[] calldata texts, Addr[] calldata addrs, bytes[] calldata chash) requireOwner(token) external {
 		for (uint256 i; i < texts.length; i += 1) {
 			_setText(token, texts[i].key, texts[i].value);

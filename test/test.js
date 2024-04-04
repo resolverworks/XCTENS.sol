@@ -12,12 +12,12 @@ const unique = (function() { return `chonk${++this.n}`; }).bind({n: 0});
 
 // hypothetical "server" that signs approval using god key
 const god = ethers.Wallet.createRandom();
-function whitelist(label, address) {
+function whitelist(label, owner) {
 	label = ethers.ensNormalize(label);
 	if ([...label].length < 4) throw new Error('too short');
-	let hash = ethers.solidityPackedKeccak256(['address', 'address', 'string'], [god.address, address, label]);
+	let hash = ethers.solidityPackedKeccak256(['address', 'address', 'string'], [god.address, owner, label]);
 	let proof = god.signingKey.sign(hash).serialized;
-	return {label, proof};
+	return {label, proof, owner};
 }
 
 const args0 = {
@@ -32,13 +32,12 @@ before(async () => {
 	foundry = await Foundry.launch();
 	nft_owner = foundry.requireWallet('admin');
 	nft = await foundry.deploy({file: 'XCTENS', args: [to_address(foundry.wallets.admin), to_address(god), args0.name, args0.symbol, args0.url]}, {
-		async $register(proof, label, {wallet = nft_owner, owner, address, avatar = ''} = {}) {
+		async $register(proof, label, {wallet = nft_owner, owner, texts = {}, addrs = {}, chash = '0x'} = {}) {
 			wallet = foundry.requireWallet(wallet);
 			if (!owner) owner = to_address(wallet);
-			if (!address) address = owner;
-			await foundry.confirm(this.connect(wallet).register(proof, label, owner, address, avatar));
+			await foundry.confirm(this.connect(wallet).register(proof, label, owner, Object.entries(texts), Object.entries(addrs), chash));
 			let token = await this.tokenFor(label);
-			return {token, owner, address, avatar};
+			return {token, owner};
 		}
 	});
 });
@@ -53,12 +52,14 @@ test('simple checks', async T => {
 });
 
 test('register a name w/proof', async T => {
-	let {proof, label} = whitelist(unique(), to_address(foundry.wallets.admin));
+	let {proof, label, owner} = whitelist(unique(), to_address(foundry.wallets.admin));
 	let avatar = 'https://raffy.antistupid.com/ens.jpg';
+	let addr60 = '0x51050ec063d393217B436747617aD1C2285Aeeee'.toLowerCase();
+	let chash = '0x1234';
 	await T.test('check available = true', async () => {
 		assert.equal(await nft.available(label), true);
 	});
-	let {token, owner, address} = await nft.$register(proof, label, {avatar});	
+	let {token} = await nft.$register(proof, label, {texts: {avatar}, addrs: {60: addr60}, chash});
 	await T.test('check available = false', async () => {
 		assert.equal(await nft.available(label), false);
 	});
@@ -68,11 +69,17 @@ test('register a name w/proof', async T => {
 	await T.test('check name', async () => {
 		assert.equal(await nft['name(uint256)'](token), label);
 	});
-	await T.test('check avatar', async () => {
+	await T.test('check evm', async () => {
+		assert.equal(await nft.addr(token, EVM_CTY), owner.toLowerCase());
+	});
+	await T.test('check text:avatar', async () => {
 		assert.equal(await nft.text(token, 'avatar'), avatar);
 	});
-	await T.test('check evm', async () => {
-		assert.equal(await nft.addr(token, EVM_CTY), address.toLowerCase());
+	await T.test('check addr:60', async () => {
+		assert.equal(await nft.addr(token, 60), addr60);
+	});
+	await T.test('check contenthash', async () => {
+		assert.equal(await nft.contenthash(token), chash);
 	});
 });
 
@@ -91,8 +98,9 @@ test('wrong proof', async T => {
 test('transfer a name', async T => {
 	let A = await foundry.ensureWallet('A');
 	let B = await foundry.ensureWallet('B');
+	let avatar = 'chonk';
 	let {proof, label} = whitelist(unique(), to_address(A));
-	let {token, avatar} = await nft.$register(proof, label, {wallet: A, avatar: 'chonk'});
+	let {token} = await nft.$register(proof, label, {wallet: A, texts: {avatar}});
 	await T.test('check owner = A', async () => {
 		assert.equal(await nft.ownerOf(token), to_address(A));
 	});
