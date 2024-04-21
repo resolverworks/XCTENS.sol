@@ -27,24 +27,23 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 	struct Addr { uint256 cty; bytes value; }
 
 	// https://adraffy.github.io/keccak.js/test/demo.html#algo=keccak-256&s=universal&escape=1&encoding=utf8
-	// 0x06e0989d8168c3a954e5b385b12a16a30139850a1596d8de0f6ecfc92bed71a8
-	// note: (CTY_EVM | 0x80000000) == 0
-	uint256 constant CTY_EVM = uint256(keccak256(bytes("universal"))); 
+	uint256 constant EVM_CTY = 0x06e0989d8168c3a954e5b385b12a16a30139850a1596d8de0f6ecfc92bed71a8; // | 0x8000000 = 0
 
 	uint256 public totalSupply;
 	string public baseUri;
 	address public signer;
-	mapping(address => mapping(uint256 => mapping(string => string))) _texts;
-	mapping(address => mapping(uint256 => mapping(uint256 => bytes))) _addrs;
-	mapping(address => mapping(uint256 => bytes)) _chashes;
+	mapping(bytes32 => mapping(string => string)) _texts;
+	mapping(bytes32 => mapping(uint256 => bytes)) _addrs;
+	mapping(bytes32 => bytes) _chashes;
 	mapping(uint256 => string) _names;
 
 	constructor(
+		address _owner,
 		address _signer,
 		string memory _name,
 		string memory _symbol,
 		string memory _baseUri
-	) ERC721(_name, _symbol) Ownable(msg.sender) {
+	) ERC721(_name, _symbol) Ownable(_owner) {
 		baseUri = _baseUri;
 		signer = _signer;
 	}
@@ -67,13 +66,21 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 		_unpause();
 	}
 	
+	// utils
+	function _nodeFromParts(address owner, uint256 token) internal pure returns (bytes32) {
+		return keccak256(abi.encodePacked(token, owner));
+	}
+	function _node(uint256 token) internal view returns (bytes32) {
+		return _nodeFromParts(_ownerOf(token), token);
+	}
+
 	// ERC721
 	function _update(address to, uint256 token, address auth) internal override(ERC721, ERC721Pausable) returns (address ret) {
 		address prior = _ownerOf(token);
 		ret = super._update(to, token, auth); // execute the trade
 		if (prior != address(0)) { // on trade, auto-enable evm address from owner...
-			if (_addrs[to][token][CTY_EVM].length == 0) { // ...if unset
-				_setAddr(token, CTY_EVM, abi.encodePacked(to));
+			if (_addrs[_node(token)][EVM_CTY].length == 0) { // ...if unset
+				_setAddr(token, EVM_CTY, abi.encodePacked(to));
 			}
 		}
 	}
@@ -97,7 +104,7 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 		_names[token] = label; // reverse name
 		totalSupply++;
 		emit Registered(token, label, owner);
-		_setAddr(token, CTY_EVM, abi.encodePacked(owner));
+		_setAddr(token, EVM_CTY, abi.encodePacked(owner));
 		for (uint256 i; i < texts.length; i += 1) {
 			_setText(token, texts[i].key, texts[i].value);
 		}
@@ -111,27 +118,27 @@ contract XCTENS is ERC721, ERC721Pausable, Ownable {
 
 	// unsafe setters
 	function _setAddr(uint256 token, uint256 cty, bytes memory value) internal {
-		_addrs[_ownerOf(token)][token][cty] = value;
+		_addrs[_node(token)][cty] = value;
 		emit AddrChanged(token, cty, value);
 	}
 	function _setText(uint256 token, string memory key, string memory value) internal {
-		_texts[_ownerOf(token)][token][key] = value;
+		_texts[_node(token)][key] = value;
 		emit TextChanged(token, key, value);
 	}
 	function _setContenthash(uint256 token, bytes memory value) internal {
-		_chashes[_ownerOf(token)][token] = value;
+		_chashes[_node(token)] = value;
 		emit ContenthashChanged(token, value);
 	}
 
 	// record getters
 	function addr(uint256 token, uint256 cty) external view returns (bytes memory) {
-		return _addrs[_ownerOf(token)][token][cty];
+		return _addrs[_node(token)][cty];
 	}
 	function text(uint256 token, string calldata key) external view returns (string memory) {
-		return _texts[_ownerOf(token)][token][key];
+		return _texts[_node(token)][key];
 	}
 	function contenthash(uint256 token) external view returns (bytes memory) {
-		return _chashes[_ownerOf(token)][token];
+		return _chashes[_node(token)];
 	}
 	function name(uint256 token) external view returns (string memory) {
 		return _names[token];

@@ -7,7 +7,7 @@
 		"test-multicall": "node --env-file=.env test/multicall.js"
 	},
 	"devDependencies": {
-		"@adraffy/blocksmith": "^0.0.10",
+		"@adraffy/blocksmith": "^0.0.18",
 		"ethers": "^6.11.1"
 	}
 }

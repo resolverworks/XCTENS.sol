@@ -31,7 +31,8 @@ let foundry, nft, nft_owner;
 before(async () => {
 	foundry = await Foundry.launch();
 	nft_owner = foundry.requireWallet('admin');
-	nft = await foundry.deploy({file: 'XCTENS', args: [to_address(foundry.wallets.admin), to_address(god), args0.name, args0.symbol, args0.url]}, {
+	nft = await foundry.deploy({from: nft_owner, file: 'XCTENS', args: [to_address(god), args0.name, args0.symbol, args0.url]});
+	Object.assign(nft, {
 		async $register(proof, label, {wallet = nft_owner, owner, texts = {}, addrs = {}, chash = '0x'} = {}) {
 			wallet = foundry.requireWallet(wallet);
 			if (!owner) owner = to_address(wallet);
